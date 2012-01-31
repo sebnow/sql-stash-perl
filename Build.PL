@@ -11,6 +11,9 @@ my $builder = Module::Build->new(
 		'Module::Build' => '',
 	},
 	build_requires => {
+		'DBI' => '',
+		'Test::Exception' => '',
+		'Test::MockModule' => '',
 		'Test::More' => '',
 	},
 	requires => {
