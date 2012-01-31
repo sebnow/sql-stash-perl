@@ -6,13 +6,55 @@ use v5.6;
 use Carp qw(croak);
 use version v0.77;
 
+use constant CACHE_DEFAULT => 1;
+
 our $VERSION = version->declare("v0.0.0");
+my %STASH;
 
 sub new {
 	my ($class, %args) = @_;
 	my $self = bless({}, $class);
 	$self->{'dbh'} = $args{'dbh'} or croak("DBI handle missing");
+	$self->{'stash'} = {};
 	return $self;
+}
+
+sub stash {
+	my ($class, $name, $sql, $should_cache) = @_;
+	my $stash;
+	$should_cache ||= CACHE_DEFAULT;
+
+	if(ref($class)) {
+		$stash = $class->{'stash'};
+	} else {
+		$STASH{$class} ||= {};
+		$stash = $STASH{$class};
+	}
+
+	$stash->{$name} = {
+		'sql' => $sql,
+		'should_cache' => $should_cache || 1,
+	};
+	return;
+}
+
+sub retrieve {
+	my ($self, $name) = @_;
+	my $class = ref($self) || $self;
+	my $sth;
+	my $stashed;
+
+	if(ref($self)) {
+		$stashed = $self->{'stash'}->{$name};
+	}
+	$stashed ||= $STASH{$class}->{$name} or return;
+
+	if($stashed->{'should_cache'}) {
+		$sth = $self->{'dbh'}->prepare_cached($stashed->{'sql'});
+	} else {
+		$sth = $self->{'dbh'}->prepare($stashed->{'sql'});
+	}
+	return $sth;
 }
 
 1;
@@ -24,6 +66,20 @@ __END__
 SQL::Stash - A stash for SQL queries
 
 =head1 SYNOPSIS
+
+	package SQL::Stash::Foo;
+	use base qw(SQL::Stash);
+	__PACKAGE__->stash('select_foo', 'SELECT * FROM Foo');
+	1;
+
+	package main;
+	my $dbh = DBI->connect('dbi:SQLite:dbname=:memory:', '', '');
+	my $stash = SQL::Stash::Foo->new();
+	my $sth = $stash->retrieve('select_foo');
+	$sth->execute();
+	while(my $row = $sth->fetchrow_arrayref()) {
+		print("$_\n") for @$row;
+	}
 
 =head1 DESCRIPTION
 
@@ -48,6 +104,30 @@ provided.
 
 	my $dbh = DBI->connect('dbi:SQLite:dbname=:memory:', '', '');
 	my $stash = SQL::Stash->new('dbh' => $dbh);
+
+=head2 stash
+
+	SQL::Stash::Foo->stash($name, $statement, $should_cache);
+	$stash->stash($name, $statement, $should_cache);
+
+Stash an SQL C<statement>. The method can be called both on the class
+and instance. If the class method is called the C<statement> will be
+added to the global stash. If the instance method is called the
+C<statement> will only be added to the instance-specific C<stash>.
+
+The C<name> is used as an identifier in order to later
+L<retrieve|retrieve> it. The C<should_cache> parameter is optional and
+specifies whether C<prepare()> or C<prepare_cached()> is used to prepare
+the C<statement>. It defaults to C<true>.
+
+	SQL::Stash::Foo->stash('select_foo', 'SELECT * FROM Foo');
+
+=head2 retrieve
+
+	$stash->retrieve($name);
+
+Prepare the statement stored via L<stashed|stash>, identified by
+C<name>, and return a prepared statement handle.
 
 =head1 SEE ALSO
 
