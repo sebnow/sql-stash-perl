@@ -8,7 +8,7 @@ use version v0.77;
 
 use constant CACHE_DEFAULT => 1;
 
-our $VERSION = version->declare("v0.0.0");
+our $VERSION = version->declare("v0.1.0");
 my %STASH;
 
 sub new {
