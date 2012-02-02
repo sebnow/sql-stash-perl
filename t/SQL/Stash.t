@@ -11,6 +11,7 @@ BEGIN {
 };
 
 subtest "Given the SQL::Stash class" => sub {
+	plan tests => 2;
 	my $mock_dbi = Test::MockModule->new('DBI');
 	$mock_dbi->mock('connect', sub {return bless({}, shift)});
 	throws_ok(sub {SQL::Stash->new()}, qr/DBI handle missing/,
