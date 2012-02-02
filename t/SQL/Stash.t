@@ -4,7 +4,7 @@ use warnings;
 
 use Test::Exception;
 use Test::MockModule;
-use Test::More 'tests' => 5;
+use Test::More 'tests' => 6;
 
 BEGIN {
 	use_ok('SQL::Stash') or BAIL_OUT('Unable to use SQL::Stash');
@@ -65,3 +65,13 @@ subtest "Instance specific stash" => sub {
 		"then the class statement will be overwritten");
 };
 
+subtest "Sprintf formatting" => sub {
+	my $dbh = DBI->connect("dbi:Mock:", "", "");
+	my $stash = SQL::Stash->new('dbh' => $dbh);
+	SQL::Stash->stash('select_dummy', 'SELECT * FROM %s');
+	my $sth = $stash->retrieve('select_dummy', 'Dummy');
+	is($sth->{'mock_statement'}, 'SELECT * FROM Dummy',
+		"when a statement contains sprintf formatting ".
+		"and the sql is retrieved with arguments ".
+		"then the sql should be formatted with the arguments");
+};

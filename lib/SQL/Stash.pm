@@ -39,7 +39,8 @@ sub stash {
 }
 
 sub retrieve {
-	my ($self, $name) = @_;
+	my $self = shift;
+	my $name = shift;
 	my $class = ref($self) || $self;
 	my $sth;
 	my $stashed;
@@ -48,13 +49,20 @@ sub retrieve {
 		$stashed = $self->{'stash'}->{$name};
 	}
 	$stashed ||= $STASH{$class}->{$name} or return;
+	my $sql = $self->transform_sql($stashed->{'sql'}, @_);
 
 	if($stashed->{'should_cache'}) {
-		$sth = $self->{'dbh'}->prepare_cached($stashed->{'sql'});
+		$sth = $self->{'dbh'}->prepare_cached($sql);
 	} else {
-		$sth = $self->{'dbh'}->prepare($stashed->{'sql'});
+		$sth = $self->{'dbh'}->prepare($sql);
 	}
 	return $sth;
+}
+
+sub transform_sql {
+	my $self = shift;
+	my $sql = shift;
+	return sprintf($sql, @_);
 }
 
 1;
@@ -124,10 +132,23 @@ the C<statement>. It defaults to C<true>.
 
 =head2 retrieve
 
-	$stash->retrieve($name);
+	$stash->retrieve($name, @_);
 
-Prepare the statement stored via L<stashed|stash>, identified by
-C<name>, and return a prepared statement handle.
+Prepare the statement stored via L<stash|stash>, identified by C<name>,
+and return a prepared statement handle. The SQL statement may be
+modified by L<transform_sql|transform_sql> before it is prepared.
+
+=head2 transform_sql
+
+	$stash->transform_sql($sql, @_)
+
+Transform the SQL statement before it is prepared to enable dynamically
+generated statements. The default implementation is to use
+L<sprintf|sprintf>, but sub-classes may override this method to perform
+any transformation.
+
+	$stash->transform_sql("SELECT * FROM %s", "table");
+	#=> SELECT * FROM table
 
 =head1 SEE ALSO
 
